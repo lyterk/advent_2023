@@ -6,6 +6,7 @@
 // They are either possible or impossible, given the true # of cubes.
 
 // Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+use std::cmp;
 
 use nom::{
     branch::alt,
@@ -57,9 +58,8 @@ struct Game {
 
 impl Game {
     fn is_valid(&self) -> bool {
-        let (R, G, B) = (12, 13, 14);
+        let (max_r, max_g, max_b) = (12, 13, 14);
 
-        let mut result = false;
         for draw in &self.draws {
             let (mut r, mut g, mut b) = (0, 0, 0);
             for block in draw {
@@ -70,19 +70,39 @@ impl Game {
                 };
             }
 
-            if !(r <= R && g <= G && b <= B) {
+            if !(r <= max_r && g <= max_g && b <= max_b) {
                 return false;
             }
         }
         true
     }
+
+    fn power(&self) -> u64 {
+        let (mut min_r, mut min_g, mut min_b) = (0, 0, 0);
+
+        for draw in &self.draws {
+            let (mut r, mut g, mut b) = (0, 0, 0);
+            for block in draw {
+                match block {
+                    Block::Red(x) => r = r + x,
+                    Block::Green(x) => g = g + x,
+                    Block::Blue(x) => b = b + x,
+                }
+            }
+            min_r = cmp::max(min_r, r);
+            min_g = cmp::max(min_g, g);
+            min_b = cmp::max(min_b, b);
+            println!("{min_r}, {min_g}, {min_b}");
+        }
+        min_r as u64 * min_g as u64 * min_b as u64
+    }
 }
 
 struct PartOne(Vec<Game>);
 
-struct PartTwo(Vec<Block>);
+struct PartTwo(Vec<Game>);
 
-struct MyResult(u32);
+struct MyResult(u64);
 
 impl From<PartOne> for MyResult {
     fn from(value: PartOne) -> Self {
@@ -91,8 +111,15 @@ impl From<PartOne> for MyResult {
             games
                 .iter()
                 .filter(|g| g.is_valid())
-                .fold(0, |acc, g| acc + g.game_id),
+                .fold(0, |acc, g| acc + g.game_id) as u64,
         )
+    }
+}
+
+impl From<PartTwo> for MyResult {
+    fn from(value: PartTwo) -> Self {
+        let PartTwo(games) = value;
+        Self(games.iter().map(|g| g.power()).sum())
     }
 }
 
@@ -101,6 +128,12 @@ mod tests {
     use std::fs::read_to_string;
 
     use super::*;
+
+    const TEST_INPUT: &str = "Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
+Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
+Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green";
 
     #[test]
     fn test_parse_block() {
@@ -141,12 +174,7 @@ mod tests {
 
     #[test]
     fn test_part_one_known() {
-        let games = "Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
-Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
-Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
-Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
-Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green";
-        let (_, games) = parse_games(games).unwrap();
+        let (_, games) = parse_games(TEST_INPUT).unwrap();
         let result = MyResult::from(PartOne(games));
         assert_eq!(8, result.0);
     }
@@ -155,7 +183,22 @@ Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green";
     fn test_part_one() {
         let s = read_to_string("resources/2.txt").unwrap();
         let (_, games) = parse_games(&s).unwrap();
-        let result = MyResult::from(PartOne(games));
-        assert_eq!(8, result.0);
+        let MyResult(result) = MyResult::from(PartOne(games));
+        assert_eq!(2105, result);
+    }
+
+    #[test]
+    fn test_part_two_known() {
+        let (_, games) = parse_games(TEST_INPUT).unwrap();
+        let MyResult(result) = MyResult::from(PartTwo(games));
+        assert_eq!(2286, result);
+    }
+
+    #[test]
+    fn test_part_two() {
+        let s = read_to_string("resources/2.txt").unwrap();
+        let (_, games) = parse_games(&s).unwrap();
+        let MyResult(result) = MyResult::from(PartTwo(games));
+        assert_eq!(72422, result);
     }
 }
